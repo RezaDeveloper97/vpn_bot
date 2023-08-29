@@ -2,10 +2,8 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-$log_file = "./my-errors.log";
 ini_set("log_errors", TRUE);
-ini_set('error_log', $log_file);
-
+ini_set('error_log', "./my-errors.log");
 
 trait log
 {
@@ -128,6 +126,7 @@ class TelegramDb extends Database
     {
         parent::__construct();
     }
+
     public function checkUser($telegram_id)
     {
         $user = $this->fetch("select * from users where telegram_id = ?", [$telegram_id]);
@@ -294,8 +293,6 @@ class Story
     }
 }
 
-
-
 function logFile($inp, $file = 'log.html', $file_type = 0)
 {
     ob_start();
@@ -305,16 +302,14 @@ function logFile($inp, $file = 'log.html', $file_type = 0)
 }
 
 $json = json_decode(file_get_contents('php://input'));
+if (!isset($json->message) || !isset($json->message->chat) || !isset($json->message->chat->type)) {
+    logFile('Not Message');
+    exit;
+}
 
-if (isset($json->message)) {
-    if (isset($json->message->chat)) {
-        if (isset($json->message->chat->type)) {
-            if ($json->message->chat->type != 'private') {
-                logFile('Not Private');
-                exit;
-            }
-        }
-    }
+if ($json->message->chat->type != 'private') {
+    logFile('Not Private');
+    exit;
 }
 
 $user_text = $json->message->text;
