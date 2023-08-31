@@ -57,7 +57,7 @@ class Database
     public function fetchAll($query, $params = [])
     {
         $stmt = $this->query($query, $params);
-        return json_encode($stmt->fetchAll());
+        return $stmt->fetchAll();
     }
 
     public function fetch($query, $params = [])
@@ -89,19 +89,24 @@ class ApiBot
     public static $api_link = 'https://api.telegram.org/bot6365565872:AAHWnyrWlm1xYZAezPxMktYwRVRVrY_-Osg';
     public static $bot_link = 'http://t.me/secure_net_vpn_bot';
 
-    public function sendMessage($chat_id, $text, $reply_markup = null)
+    public function sendMessage($chat_id, $text, $reply_markup = null, $pars_mode = null)
     {
         $apiUrl = $this::$api_link . "/sendMessage";
 
         $params = [
             'chat_id' => $chat_id,
-            'text' => $text
+            'text' => $text,
+            'parse_mode' => $pars_mode
         ];
 
         if (is_array($reply_markup)) {
             $params['reply_markup'] = json_encode($reply_markup);
         } elseif ($reply_markup === false) {
             $params['reply_markup'] = json_encode(['hide_keyboard' => true]);
+        }
+
+        if (isset($pars_mode)) {
+            $params['parse_mode'] = $pars_mode;
         }
 
         $this->_sender($apiUrl, $params);
@@ -119,6 +124,8 @@ class ApiBot
 
         $response = curl_exec($ch);
 
+        $this::log($response);
+
         curl_close($ch);
 
         return $response;
@@ -135,8 +142,7 @@ class TelegramDb extends Database
 
     public function checkUser($telegram_id)
     {
-        $user = $this->fetch("select * from users where telegram_id = ?", [$telegram_id]);
-        return $user;
+        return $this->fetch("select * from users where telegram_id = ?", [$telegram_id]);
     }
 
     public function insertUser($telegram_id, $firstname, $lastname, $username)
@@ -152,15 +158,50 @@ class TelegramDb extends Database
         return $user['id'];
     }
 
-    public function setStory($user_id, $title, $data = null): void
+    public function setStory($user_id, $title, $data = null)
     {
         $this->query("REPLACE INTO `story`(`user_id`, `title`, `data`) VALUES (?,?,?)", [$user_id, $title, $data]);
+    }
+
+    public function setDataStory($user_id, $data)
+    {
+        $this->query("UPDATE `story` SET `data` = ? WHERE `user_id` = ?", [$data, $user_id]);
     }
 
     public function getStory($user_id)
     {
         return $this->fetch("SELECT * FROM `story` WHERE `user_id` = ?", [$user_id]);
     }
+
+    public function checkUserPass($user_id, $username, $password)
+    {
+        return $this->fetch("SELECT * FROM `sellers` WHERE `user_id` = ? AND `username` = ? AND `password` = ?", [$user_id, $username, $password]);
+    }
+
+    public function getPackagesByParentId($parent_id)
+    {
+        return $this->fetchAll("SELECT * FROM `packages` WHERE `parent_id` = ?", [$parent_id]);
+    }
+
+    public function getPackageByParentIdAndTitle($parent_id, $title)
+    {
+        return $this->fetch("SELECT * FROM `packages` WHERE `parent_id` = ? AND `title` = ?", [$parent_id, $title]);
+    }
+
+    public function getFullTitlePackage($id)
+    {
+        $result = [];
+        $this_package = $this->fetch("SELECT * FROM `packages` WHERE `id` = ?", [$id]);
+        $result[] = $this_package['title'];
+
+        if ($this_package['parent_id'] != 0) {
+            $parentTitles = $this->getFullTitlePackage($this_package['parent_id']);
+            $result = array_merge($result, $parentTitles);
+        }
+
+        return $result;
+    }
+
 }
 
 class MentTextContext
@@ -241,6 +282,15 @@ class TelegramContext extends ApiBot
         $this->sendMessage($this->telegram_id, "فروشنده محترم خوش آمدید", $keyboard);
     }
 
+    public function backToHome()
+    {
+        $keyboard = $this->keyboardGenerator([
+            [MentTextContext::get('buyers'), MentTextContext::get('change_price')],
+            [MentTextContext::get('mylink')]
+        ]);
+        $this->sendMessage($this->telegram_id, "بازگشت به منوی اصلی", $keyboard);
+    }
+
     public function send_my_link($link)
     {
         $keyboard = $this->keyboardGenerator([
@@ -257,11 +307,35 @@ class TelegramContext extends ApiBot
             [MentTextContext::get('mylink')]
         ]);
 
-        if(count($buyers) > 0) {
+        if (count($buyers) > 0) {
 
         } else {
             $this->sendMessage($this->telegram_id, "شما فعلا هیچ خریداری ندارید", $keyboard);
         }
+    }
+
+    public function change_price_loop(array $packages)
+    {
+        $packages = array_map(function ($item) {
+            return [$item['title']];
+        }, $packages);
+        $packages[] = [MentTextContext::get('cancel')];
+        $keyboard = $this->keyboardGenerator($packages);
+        $this->sendMessage($this->telegram_id, "یکی از موارد زیر را انتخاب کنید", $keyboard);
+    }
+
+    public function price_package($title, $price)
+    {
+        $keyboard = $this->keyboardGenerator([
+            [MentTextContext::get('change_price')],
+            [MentTextContext::get('cancel')]
+        ]);
+        $this->sendMessage($this->telegram_id, "ایتم <b>$title</b> به قیمت <b>$price</b> می باشد.\nآیا میخواهید تغییر قیمت لحاظ کنید ؟", $keyboard, 'HTML');
+    }
+
+    public function send_new_price_package()
+    {
+        $this->sendMessage($this->telegram_id, "لطفا قیمت جدید این ایتم رو وارد کنید (فقط عدد)", false);
     }
 }
 
@@ -319,7 +393,12 @@ class Story
         if ($this->user_text == MentTextContext::get('cancel')) {
             $this->TelegramContext->backToStart();
             $this->TelegramDb->setStory($this->user_id, 'chooseSellerOrBuyer');
-        } elseif ($this->dataStory == 'test' && $this->user_text == '1234') {
+            return false;
+        }
+
+        $checkUserPass = $this->TelegramDb->checkUserPass($this->user_id, $this->dataStory, $this->user_text);
+
+        if ($checkUserPass) {
             $this->TelegramContext->welcome_seller();
             $this->TelegramDb->setStory($this->user_id, 'welcomeSeller', '');
         } else {
@@ -329,11 +408,77 @@ class Story
 
     public function welcomeSeller()
     {
-        if($this->user_text == MentTextContext::get('mylink')) {
+        if ($this->user_text == MentTextContext::get('mylink')) {
             $link = $this->TelegramContext::$bot_link . "?start=" . $this->TelegramContext->telegram_id;
             $this->TelegramContext->send_my_link($link);
-        } elseif($this->user_text == MentTextContext::get('buyers')) {
+        } elseif ($this->user_text == MentTextContext::get('buyers')) {
             $this->TelegramContext->send_my_buyers([]);
+        } elseif ($this->user_text == MentTextContext::get('change_price')) {
+            $parent_id = 0;
+            $packages = $this->TelegramDb->getPackagesByParentId($parent_id);
+            $this->TelegramContext->change_price_loop($packages);
+            $this->TelegramDb->setStory($this->user_id, 'changePriceLoop', $parent_id);
+        } else {
+            $this->iDontKnow();
+        }
+    }
+
+    public function changePriceLoop()
+    {
+        if ($this->user_text == MentTextContext::get('cancel')) {
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->setStory($this->user_id, 'welcomeSeller');
+            return false;
+        }
+
+        $parent_id = $this->dataStory;
+        $selected_package = $this->TelegramDb->getPackageByParentIdAndTitle($parent_id, $this->user_text);
+
+        if ($selected_package) {
+            $selected_parent_id = $selected_package['id'];
+            $this->TelegramDb->setDataStory($this->user_id, $selected_parent_id);
+
+            if ($selected_package['price'] != null) {
+
+                $titles = $this->TelegramDb->getFullTitlePackage($selected_parent_id);
+
+                $title = join(' ', array_reverse($titles));
+
+                $this->TelegramContext->price_package($title, number_format($selected_package['price']));
+                $this->TelegramDb->setStory($this->user_id, 'isChangePriceItem', $parent_id);
+
+            } else {
+                $packages = $this->TelegramDb->getPackagesByParentId($selected_parent_id);
+                $this->TelegramContext->change_price_loop($packages);
+            }
+        } else {
+            $this->iDontKnow();
+        }
+    }
+
+    public function isChangePriceItem()
+    {
+        if ($this->user_text == MentTextContext::get('cancel')) {
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->setStory($this->user_id, 'welcomeSeller');
+        } elseif($this->user_text == MentTextContext::get('change_price')) {
+            $this->TelegramContext->send_new_price_package();
+            $this->TelegramDb->setStory($this->user_id, 'newPricePackage', $this->dataStory);
+            
+        } else {
+            $this->iDontKnow();
+        }
+    }
+
+    public function newPricePackage()
+    {
+        if ($this->user_text == MentTextContext::get('cancel')) {
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->setStory($this->user_id, 'welcomeSeller');
+        } elseif(is_numeric($this->user_text)) {
+            $this->TelegramContext->send_new_price_package();
+            $this->TelegramDb->setStory($this->user_id, 'newPricePackage', $this->dataStory);
+            
         } else {
             $this->iDontKnow();
         }
