@@ -476,9 +476,9 @@ class Story
             $this->TelegramContext->backToHome();
             $this->TelegramDb->setStory($this->user_id, 'welcomeSeller');
         } elseif(is_numeric($this->user_text)) {
-            $this->TelegramContext->send_new_price_package();
-            $this->TelegramDb->setStory($this->user_id, 'newPricePackage', $this->dataStory);
-            
+            // $this->TelegramContext->send_new_price_package();
+            // $this->TelegramDb->setStory($this->user_id, 'newPricePackage', $this->dataStory);
+            $this->TelegramContext->sendMessage($this->TelegramContext->telegram_id, "True");
         } else {
             $this->iDontKnow();
         }
