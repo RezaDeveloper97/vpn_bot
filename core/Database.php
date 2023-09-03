@@ -1,15 +1,20 @@
 <?php
-class Database
+abstract class Database
 {
     use log;
-    private $host = 'localhost';
-    private $db_name = 'yatash_bot';
-    private $username = 'yatash_botadmin';
-    private $password = '&]$g~k?sz}{3';
+    private $host = '';
+    private $db_name = '';
+    private $username = '';
+    private $password = '';
     private $conn;
 
     public function __construct()
     {
+        $this->host = ConfigContext::get('host');
+        $this->db_name = ConfigContext::get('db_name');
+        $this->username = ConfigContext::get('username');
+        $this->password = ConfigContext::get('password');
+
         $dsn = "mysql:host={$this->host};dbname={$this->db_name};charset=utf8";
         $options = [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -20,7 +25,7 @@ class Database
         try {
             $this->conn = new \PDO($dsn, $this->username, $this->password, $options);
         } catch (\PDOException $e) {
-            $this->log($e->getMessage(), 'dblog.html');
+            $this::log($e->getMessage(), 'dblog.html');
             throw new \Exception("Connection failed: " . $e->getMessage());
         }
     }
@@ -35,7 +40,7 @@ class Database
     public function fetchAll($query, $params = [])
     {
         $stmt = $this->query($query, $params);
-        return json_encode($stmt->fetchAll());
+        return $stmt->fetchAll();
     }
 
     public function fetch($query, $params = [])
@@ -54,9 +59,9 @@ class Database
         try {
             $this->query('TRUNCATE TABLE `users`');
             $this->query('TRUNCATE TABLE `story`');
-        } catch (\PDOException $e) {
-            $this->log($e->getMessage(), 'dblog.html');
+            $this->query('TRUNCATE TABLE `user_packages`');
+        } catch (PDOException $e) {
+            $this::log($e->getMessage(), 'dblog.html');
         }
     }
-
 }
