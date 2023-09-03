@@ -67,7 +67,7 @@ final class Story
             $generateTable = $PackageTree->generateTable($this->TelegramDb->getAllPackages($this->user_reference), $user_packages);
 
             createPDF::pricesList($generateTable, $pdf_file_path);
-            $this->TelegramContext->send_file($pdf_file_path, TextContext::get('listOfTheLatestPrices'));
+            $this->TelegramContext->send_file($pdf_file_path, TextContext::get('listOfTheLatestPrices'), MentContext::home());
         } else {
             $this->iDontKnow(MentContext::home());
         }
@@ -134,10 +134,35 @@ final class Story
 
             $this->TelegramDb->addUserPackage($this->user_id, $this->dataStory, $this->user_text);
             $this->TelegramContext->changed_new_price_package();
+
+            $percentage = ((floatval($this->user_text) - floatval($this_packge_price)) / floatval($this_packge_price)) * 100;
+            $percentage = ceil($percentage);
+
+            $this->TelegramContext->addToPrices($percentage);
+            $this->TelegramDb->setStory($this->user_id, 'addToPrices', json_encode(['percentage' => $percentage, 'package_id' => $this->dataStory]));
+        } else {
+            $this->iDontKnow(MentContext::cancel());
+        }
+    }
+
+    public function addToPrices()
+    {
+        if ($this->user_text == MentTextContext::get('no_answar')) {
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->delStory($this->user_id);
+        } elseif ($this->user_text == MentTextContext::get('yes_answar')) {
+
+            $js = json_decode($this->dataStory);
+            $percentage = (int) $js->percentage;
+            $package_id = (int) $js->package_id;
+
+            $this->TelegramDb->addUserPackageByPercentage($this->user_id, $percentage, $this->user_reference, $package_id);
+            $this->TelegramContext->changed_new_price_package();
+
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
         } else {
-            $this->iDontKnow(MentContext::cancel());
+            $this->iDontKnow(MentContext::questionYesNo());
         }
     }
 

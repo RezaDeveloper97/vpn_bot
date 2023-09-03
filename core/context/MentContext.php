@@ -25,13 +25,15 @@ class MentContext extends MentTextContext
 
     public static function change_price_package()
     {
-        return static::keyboardGenerator([
-            [MentTextContext::get('yes_answar')],
-            [MentTextContext::get('no_answar')]
-        ]);
+        return static::questionYesNo();
     }
 
     public static function buy_package()
+    {
+        return static::questionYesNo();
+    }
+
+    public static function questionYesNo()
     {
         return static::keyboardGenerator([
             [MentTextContext::get('yes_answar')],

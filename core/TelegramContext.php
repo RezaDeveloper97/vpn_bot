@@ -100,8 +100,13 @@ class TelegramContext extends ApiBot
         $this->sendMessage($this->telegram_id, TextContext::get('SuccessfullyDoing'));
     }
 
-    public function send_file($docfilePath, $caption = null)
+    public function addToPrices($percent)
     {
-        $this->sendDocument($this->telegram_id, $docfilePath, $caption);
+        $this->sendMessage($this->telegram_id, TextContext::get('addToPrices', [$percent]), MentContext::questionYesNo());
+    }
+
+    public function send_file($docfilePath, $caption = null, $reply_markup = null)
+    {
+        $this->sendDocument($this->telegram_id, $docfilePath, $caption, $reply_markup);
     }
 }

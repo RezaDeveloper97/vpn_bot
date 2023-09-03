@@ -33,7 +33,7 @@ abstract class ApiBot
         return $this->_sender($apiUrl, $params);
     }
 
-    public function sendDocument($chat_id, $document, $caption = null)
+    public function sendDocument($chat_id, $document, $caption = null, $reply_markup = null)
     {
         $apiUrl = $this::$api_link . "/sendDocument";
 
@@ -41,6 +41,11 @@ abstract class ApiBot
             'chat_id' => $chat_id,
             'document' => new \CURLFile($document)
         ];
+
+        if (is_array($reply_markup))
+            $params['reply_markup'] = json_encode($reply_markup);
+        elseif ($reply_markup === false)
+            $params['reply_markup'] = json_encode(['hide_keyboard' => true]);
 
         if (isset($caption))
             $params['caption'] = $caption;

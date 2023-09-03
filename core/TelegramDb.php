@@ -123,4 +123,14 @@ final class TelegramDb extends Database
     {
         return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) VALUES (?,?,?)", [$user_id, $package_id, $price]);
     }
+
+    public function addUserPackageByPercentage($user_id, $percentage, $user_reference, $package_id)
+    {
+        return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) 
+        SELECT ?, t.id, IF(tt.price > 0, tt.price * 1.$percentage, t.price * 1.$percentage) as `price` 
+        FROM `packages` t 
+        LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? 
+        WHERE t.price > 0 AND t.`id` != ?;
+        ", [$user_id, $user_reference, $package_id]);
+    }
 }
