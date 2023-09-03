@@ -22,6 +22,33 @@ trait log
     }
 }
 
+trait numberConvertor
+{
+    public static $persianToEnglishMap = [
+        '۰' => '0',
+        '۱' => '1',
+        '۲' => '2',
+        '۳' => '3',
+        '۴' => '4',
+        '۵' => '5',
+        '۶' => '6',
+        '۷' => '7',
+        '۸' => '8',
+        '۹' => '9'
+    ];
+
+    public static function persianNumberToEnglish($text)
+    {
+        return str_replace(array_keys(numberConvertor::$persianToEnglishMap), array_values(numberConvertor::$persianToEnglishMap), $text);
+    }
+
+    public static function englishNumberTopersian($text)
+    {
+        return str_replace(array_values(numberConvertor::$persianToEnglishMap), array_keys(numberConvertor::$persianToEnglishMap), $text);
+    }
+}
+
+
 class Database
 {
     use log;
@@ -169,6 +196,7 @@ class ApiBot
 class PackageTree
 {
     use log;
+    use numberConvertor;
     public function buildTree($packages, $parentId)
     {
         $tree = [];
@@ -217,7 +245,7 @@ class PackageTree
 <table dir="rtl" cellspacing="10" cellpadding="5" border="0" align="center">
 <tr>
     <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">تعداد کاربر</td>
-    <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">ترافیک (GB)</td>
+    <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">ترافیک</td>
     <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">قیمت یک ماهه</td>
     <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">قیمت سه ماهه</td>
     <td style="padding:5px;background-color:#2f5496;color:#FFFFFF;border:5px solid #2f5496;">قیمت شش ماهه</td>
@@ -227,11 +255,11 @@ EOD;
         foreach ($trees as $keyTree => $tree) {
             foreach ($tree as $keyThisPackages => $thisPackages) {
                 $table .= '<tr>';
-                $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . $keyTree . '</td>';
-                $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . $keyThisPackages . '</td>';
+                $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . numberConvertor::englishNumberTopersian($keyTree) . '</td>';
+                $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . numberConvertor::englishNumberTopersian($keyThisPackages) . '</td>';
                 foreach ($thisPackages as $keyPackage => $package) {
                     $price = isset($user_packages[$keyPackage]) ? number_format($user_packages[$keyPackage]) : number_format($package);
-                    $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . $price . '</td>';
+                    $table .= '<td style="padding:5px;background-color:#d9d9d9;color:#000000;border:5px solid #d9d9d9;">' . numberConvertor::englishNumberTopersian($price) . '</td>';
                 }
                 $table .= '</tr>';
             }
@@ -267,11 +295,11 @@ class createPDF
         $lg['w_page'] = 'page';
         $pdf->setLanguageArray($lg);
 
-        $pdf->SetFont(' XNazanin ', '', 15, '', true);
+        $pdf->SetFont(' XZar ', '', 15, '', true);
 
         $pdf->AddPage();
 
-        $pdf->Write(0, 'لیست قیمت ها', '', 0, 'R', true, 0, false, false, 0);
+        $pdf->Write(0, 'لیست قیمت ها (تومان)', '', 0, 'R', true, 0, false, false, 0);
 
         $pdf->writeHTML($tbl, true, false, false, false, '');
         $pdf->Output($pdf_file_path, 'F');
@@ -299,9 +327,15 @@ class TelegramDb extends Database
         return $this->lastInsertId();
     }
 
-    public function getUserId($telegram_id)
+    public function getUserByTelegramId($telegram_id)
     {
         $user = $this->fetch("SELECT * FROM `users` WHERE `telegram_id` = ?", [$telegram_id]);
+        return $user;
+    }
+
+    public function getUserId($telegram_id)
+    {
+        $user = $this->getUserByTelegramId($telegram_id);
         return $user['id'];
     }
 
@@ -337,9 +371,9 @@ class TelegramDb extends Database
         return $this->fetch("SELECT * FROM `sellers` WHERE `user_id` = ? AND `username` = ? AND `password` = ?", [$user_id, $username, $password]);
     }
 
-    public function getAllPackages()
+    public function getAllPackages($user_reference)
     {
-        return $this->fetchAll("SELECT * FROM `packages`");
+        return $this->fetchAll("SELECT t.id, t.title, t.parent_id, IF(tt.price > 0, tt.price, t.price) as `price` FROM `packages` t LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ?", [$user_reference]);
     }
 
     public function getAllUserPackages($user_id)
@@ -347,46 +381,47 @@ class TelegramDb extends Database
         return $this->fetchAll("SELECT * FROM `user_packages` WHERE `user_id` = ?", [$user_id]);
     }
 
-    public function getPackagesByParentId($parent_id)
+    public function getPackagesByParentId($user_reference, $parent_id)
     {
-        return $this->fetchAll("SELECT * FROM `packages` WHERE `parent_id` = ?", [$parent_id]);
+        return $this->fetchAll("SELECT t.id, t.title, t.parent_id, IF(tt.price > 0, tt.price, t.price) as `price` FROM `packages` t LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? WHERE t.`parent_id` = ?", [$user_reference, $parent_id]);
     }
 
-    public function getPackageByParentIdAndTitle($parent_id, $title)
+    public function getPackageByParentIdAndTitle($user_reference, $parent_id, $title)
     {
-        return $this->fetch("SELECT * FROM `packages` WHERE `parent_id` = ? AND `title` = ?", [$parent_id, $title]);
+        return $this->fetch("SELECT t.id, t.title, t.parent_id, IF(tt.price > 0, tt.price, t.price) as `price` FROM `packages` t LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? WHERE t.`parent_id` = ? AND t.`title` = ?", [$user_reference, $parent_id, $title]);
     }
 
-    public function getFullTitlePackage($id)
+    public function getFullTitlePackage($user_reference, $id)
     {
         $result = [];
-        $this_package = $this->fetch("SELECT * FROM `packages` WHERE `id` = ?", [$id]);
+        $this_package = $this->fetch("SELECT t.id, t.title, t.parent_id, IF(tt.price > 0, tt.price, t.price) as `price` FROM `packages` t LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? WHERE t.`id` = ?", [$user_reference, $id]);
         $result[] = $this_package['title'];
 
         if ($this_package['parent_id'] != 0) {
-            $parentTitles = $this->getFullTitlePackage($this_package['parent_id']);
+            $parentTitles = $this->getFullTitlePackage($user_reference, $this_package['parent_id']);
             $result = array_merge($result, $parentTitles);
         }
 
         return $result;
     }
 
-    public function getOrginalPricePackage($package_id)
+    public function getOrginalPricePackage($user_reference, $package_id)
     {
-        $package = $this->fetch("SELECT `price` FROM `packages` WHERE `id` = ?", [$package_id]);
+        $package = $this->fetch("SELECT IF(tt.price > 0, tt.price, t.price) as `price` FROM `packages` t LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? WHERE t.`id` = ?", [$user_reference, $package_id]);
         if ($package)
+        {
             return $package['price'];
-
+        }
         return 0;
     }
 
-    public function getPricePackageByUserId($use_id, $package_id)
+    public function getPricePackageByUserId($user_reference, $use_id, $package_id)
     {
         $user_package = $this->fetch("SELECT `price` FROM `user_packages` WHERE `user_id` = ? AND `package_id` = ?", [$use_id, $package_id]);
         if ($user_package)
             return $user_package['price'];
 
-        return $this->getOrginalPricePackage($package_id);
+        return $this->getOrginalPricePackage($user_reference, $package_id);
     }
 
     public function addUserPackage($user_id, $package_id, $price)
@@ -444,8 +479,8 @@ class MentContext extends MentTextContext
     public static function change_price_package()
     {
         return static::keyboardGenerator([
-            [MentTextContext::get('change_price')],
-            [MentTextContext::get('cancel')]
+            [MentTextContext::get('yes_answar')],
+            [MentTextContext::get('no_answar')]
         ]);
     }
 
@@ -485,30 +520,6 @@ class TelegramContext extends ApiBot
     {
         $keyboard = MentContext::home();
         $this->sendMessage($this->telegram_id, "سلام $this->firstname به ربات خرید و فروش VPN خوش آمدید 🌺🤩", $keyboard);
-    }
-
-    public function backToStart()
-    {
-        $keyboard = MentContext::start();
-        $this->sendMessage($this->telegram_id, "بازگشت به منوی اصلی", $keyboard);
-    }
-
-    public function seller_input_login_user()
-    {
-        $keyboard = MentContext::cancel();
-        $this->sendMessage($this->telegram_id, "لطفا نام کاربری خود را وارد کنید", $keyboard);
-    }
-
-    public function seller_input_login_pass()
-    {
-        $keyboard = MentContext::cancel();
-        $this->sendMessage($this->telegram_id, "لطفا رمز عبور خود را وارد کنید", $keyboard);
-    }
-
-    public function seller_input_login_pass_wrong()
-    {
-        $this->sendMessage($this->telegram_id, "نام کاربری و رمز عبور اشتباه است");
-        $this->seller_input_login_pass();
     }
 
     public function welcome_seller()
@@ -565,7 +576,8 @@ class TelegramContext extends ApiBot
 
     public function send_new_price_package()
     {
-        $this->sendMessage($this->telegram_id, "لطفا قیمت جدید این ایتم رو وارد کنید (فقط عدد)");
+        $keyboard = MentContext::cancel();
+        $this->sendMessage($this->telegram_id, "لطفا قیمت جدید این ایتم رو وارد کنید (فقط عدد)", $keyboard);
     }
 
     public function low_price_package_wrong()
@@ -593,9 +605,10 @@ class Story
     public $TelegramDb;
     public $TelegramContext;
     public $dataStory;
-    public function __construct($user_id, $TelegramDb, $TelegramContext)
+    public function __construct($user, $TelegramDb, $TelegramContext)
     {
-        $this->user_id = $user_id;
+        $this->user_id = $user['id'];
+        $this->user_reference = $user['user_reference'];
         $this->TelegramDb = $TelegramDb;
         $this->TelegramContext = $TelegramContext;
         $this->user_text = $this->TelegramContext->json->message->text;
@@ -611,46 +624,6 @@ class Story
         $this->TelegramContext->sendMessage($this->TelegramContext->telegram_id, "متوجه درخواست شما نمی شوم", $keyboard);
     }
 
-    public function chooseSellerOrBuyer()
-    {
-        if ($this->user_text == MentTextContext::get('seller')) {
-            $this->TelegramContext->seller_input_login_user();
-            $this->TelegramDb->setStory($this->user_id, 'sellerLogin');
-        } elseif ($this->user_text == MentTextContext::get('buyer')) {
-        } else {
-            $this->iDontKnow();
-        }
-    }
-
-    public function sellerLogin()
-    {
-        if ($this->user_text == MentTextContext::get('cancel')) {
-            $this->TelegramContext->backToStart();
-            $this->TelegramDb->setStory($this->user_id, 'chooseSellerOrBuyer');
-        } else {
-            $this->TelegramContext->seller_input_login_pass();
-            $this->TelegramDb->setStory($this->user_id, 'sellerLoginPass', $this->user_text);
-        }
-    }
-
-    public function sellerLoginPass()
-    {
-        if ($this->user_text == MentTextContext::get('cancel')) {
-            $this->TelegramContext->backToStart();
-            $this->TelegramDb->setStory($this->user_id, 'chooseSellerOrBuyer');
-            return false;
-        }
-
-        $checkUserPass = $this->TelegramDb->checkUserPass($this->user_id, $this->dataStory, $this->user_text);
-
-        if ($checkUserPass) {
-            $this->TelegramContext->welcome_seller();
-            $this->TelegramDb->delStory($this->user_id);
-        } else {
-            $this->TelegramContext->seller_input_login_pass_wrong();
-        }
-    }
-
     public function welcomeSeller()
     {
         if ($this->user_text == MentTextContext::get('mylink')) {
@@ -658,14 +631,14 @@ class Story
             $this->TelegramContext->send_my_link($link);
         } elseif ($this->user_text == MentTextContext::get('buy_vpn')) {
             $parent_id = 0;
-            $packages = $this->TelegramDb->getPackagesByParentId($parent_id);
+            $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
             $this->TelegramContext->choose_one($packages);
             $this->TelegramDb->setStory($this->user_id, 'buyVPNLoop', $parent_id);
         } elseif ($this->user_text == MentTextContext::get('buyers')) {
             $this->TelegramContext->send_my_buyers([]);
         } elseif ($this->user_text == MentTextContext::get('change_price')) {
             $parent_id = 0;
-            $packages = $this->TelegramDb->getPackagesByParentId($parent_id);
+            $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
             $this->TelegramContext->choose_one($packages);
             $this->TelegramDb->setStory($this->user_id, 'changePriceLoop', $parent_id);
         } elseif ($this->user_text == MentTextContext::get('prices_list')) {
@@ -684,7 +657,7 @@ class Story
 
             $pdf_file_path = $pdf_path . '/PricesList.pdf';
             $PackageTree = new PackageTree();
-            $generateTable = $PackageTree->generateTable($this->TelegramDb->getAllPackages(), $user_packages);
+            $generateTable = $PackageTree->generateTable($this->TelegramDb->getAllPackages($this->user_reference), $user_packages);
 
             createPDF::pricesList($generateTable, $pdf_file_path);
             $this->TelegramContext->send_file($pdf_file_path, 'لیست اخرین قیمت ها VPN');
@@ -703,7 +676,7 @@ class Story
         }
 
         $parent_id = $this->dataStory;
-        $selected_package = $this->TelegramDb->getPackageByParentIdAndTitle($parent_id, $this->user_text);
+        $selected_package = $this->TelegramDb->getPackageByParentIdAndTitle($this->user_reference, $parent_id, $this->user_text);
 
         if ($selected_package) {
             $parent_id = $selected_package['id'];
@@ -711,16 +684,16 @@ class Story
 
             if ($selected_package['price'] != null) {
 
-                $titles = $this->TelegramDb->getFullTitlePackage($parent_id);
+                $titles = $this->TelegramDb->getFullTitlePackage($this->user_reference, $parent_id);
 
                 $title = join(' ', array_reverse($titles));
 
-                $price = $this->TelegramDb->getPricePackageByUserId($this->user_id, $parent_id);
+                $price = $this->TelegramDb->getPricePackageByUserId($this->user_reference, $this->user_id, $parent_id);
 
                 $this->TelegramContext->price_package($title, number_format($price), number_format($selected_package['price']));
                 $this->TelegramDb->setStory($this->user_id, 'isChangePriceItem', $parent_id);
             } else {
-                $packages = $this->TelegramDb->getPackagesByParentId($parent_id);
+                $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
                 $this->TelegramContext->choose_one($packages);
             }
         } else {
@@ -730,10 +703,10 @@ class Story
 
     public function isChangePriceItem()
     {
-        if ($this->user_text == MentTextContext::get('cancel')) {
+        if ($this->user_text == MentTextContext::get('no_answar')) {
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
-        } elseif ($this->user_text == MentTextContext::get('change_price')) {
+        } elseif ($this->user_text == MentTextContext::get('yes_answar')) {
             $this->TelegramContext->send_new_price_package();
             $this->TelegramDb->setStory($this->user_id, 'newPricePackage', $this->dataStory);
         } else {
@@ -747,8 +720,10 @@ class Story
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
         } elseif (is_numeric($this->user_text)) {
-            $this_packge_price = $this->TelegramDb->getOrginalPricePackage($this->user_id, $this->dataStory);
-            if ($this_packge_price >= $this->user_text) {
+            
+            $this_packge_price = $this->TelegramDb->getOrginalPricePackage($this->user_reference, $this->dataStory);
+
+            if (floatval($this_packge_price) >= floatval($this->user_text)) {
                 $this->TelegramContext->low_price_package_wrong();
                 return false;
             }
@@ -771,7 +746,7 @@ class Story
         }
 
         $parent_id = $this->dataStory;
-        $selected_package = $this->TelegramDb->getPackageByParentIdAndTitle($parent_id, $this->user_text);
+        $selected_package = $this->TelegramDb->getPackageByParentIdAndTitle($this->user_reference, $parent_id, $this->user_text);
 
         if ($selected_package) {
             $parent_id = $selected_package['id'];
@@ -779,16 +754,16 @@ class Story
 
             if ($selected_package['price'] != null) {
 
-                $titles = $this->TelegramDb->getFullTitlePackage($parent_id);
+                $titles = $this->TelegramDb->getFullTitlePackage($this->user_reference, $parent_id);
 
                 $title = join(' ', array_reverse($titles));
 
-                // $price = $this->TelegramDb->getPricePackageByUserId($this->user_id, $parent_id);
+                // $price = $this->TelegramDb->getPricePackageByUserId($this->user_reference, $this->user_id, $parent_id);
 
                 $this->TelegramContext->buy_package($title, number_format($selected_package['price']));
                 $this->TelegramDb->setStory($this->user_id, 'buyVPN', $parent_id);
             } else {
-                $packages = $this->TelegramDb->getPackagesByParentId($parent_id);
+                $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
                 $this->TelegramContext->choose_one($packages);
             }
         } else {
@@ -833,17 +808,21 @@ if ($user_text == '/reset') {
     exit;
 }
 
-if (strlen($user_text) > 6 && substr($user_text, 0, 6) == '/start') {
-    $TelegramContext->sendMessage($telegram_id, substr($user_text, 6));
-    exit;
-}
+
 
 if (!$TelegramDb->checkUser($telegram_id)) {
+    $user_refrence = 0;
 
-    $TelegramDb->insertUser($telegram_id, $firstname, $lastname, $username, 0);
+    if (strlen($user_text) > 6 && substr($user_text, 0, 6) == '/start') {
+        $ref = trim(substr($user_text, 6));
+        $user_ref = $TelegramDb->getUserByTelegramId($ref);
+        $user_refrence = $user_ref ? $user_ref['id'] : 0;
+    }
+
+    $TelegramDb->insertUser($telegram_id, $firstname, $lastname, $username, $user_refrence);
     $TelegramContext->start();
     exit;
-} else {
-    $user_id = $TelegramDb->getUserId($telegram_id);
 }
-new Story($user_id, $TelegramDb, $TelegramContext);
+
+$user = $TelegramDb->getUserByTelegramId($telegram_id);
+new Story($user, $TelegramDb, $TelegramContext);
