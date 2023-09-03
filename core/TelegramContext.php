@@ -100,9 +100,14 @@ class TelegramContext extends ApiBot
         $this->sendMessage($this->telegram_id, TextContext::get('SuccessfullyDoing'));
     }
 
-    public function addToPrices($percent)
+    public function addToPrices($number, $percentage)
     {
-        $this->sendMessage($this->telegram_id, TextContext::get('addToPrices', [$percent]), MentContext::questionYesNo());
+        $keyboard = [];
+        $keyboard[] = [TextContext::get('addToPricesByCash', [$number])];
+        $keyboard[] = [TextContext::get('addToPricesByPercentage', [$percentage])];
+        $keyboard[] = [MentTextContext::get('cancel')];
+        $keyboard = self::keyboardGenerator($keyboard);
+        $this->sendMessage($this->telegram_id, TextContext::get('addToPrices', [$number, $percentage]), $keyboard);
     }
 
     public function send_file($docfilePath, $caption = null, $reply_markup = null)

@@ -133,4 +133,14 @@ final class TelegramDb extends Database
         WHERE t.price > 0 AND t.`id` != ?;
         ", [$user_id, $user_reference, $package_id]);
     }
+
+    public function addUserPackageByCash($user_id, $cash, $user_reference, $package_id)
+    {
+        return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) 
+        SELECT ?, t.id, IF(tt.price > 0, tt.price + $cash, t.price + $cash) as `price` 
+        FROM `packages` t 
+        LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? 
+        WHERE t.price > 0 AND t.`id` != ?;
+        ", [$user_id, $user_reference, $package_id]);
+    }
 }

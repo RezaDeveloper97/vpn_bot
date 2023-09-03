@@ -138,8 +138,10 @@ final class Story
             $percentage = ((floatval($this->user_text) - floatval($this_packge_price)) / floatval($this_packge_price)) * 100;
             $percentage = ceil($percentage);
 
-            $this->TelegramContext->addToPrices($percentage);
-            $this->TelegramDb->setStory($this->user_id, 'addToPrices', json_encode(['percentage' => $percentage, 'package_id' => $this->dataStory]));
+            $cash = floatval($this->user_text) - floatval($this_packge_price);
+
+            $this->TelegramContext->addToPrices($cash . "", $percentage . "");
+            $this->TelegramDb->setStory($this->user_id, 'addToPrices', json_encode(['percentage' => $percentage, 'cash' => $cash, 'package_id' => $this->dataStory]));
         } else {
             $this->iDontKnow(MentContext::cancel());
         }
@@ -147,16 +149,24 @@ final class Story
 
     public function addToPrices()
     {
-        if ($this->user_text == MentTextContext::get('no_answar')) {
+        $js = json_decode($this->dataStory);
+        $percentage = $js->percentage;
+        $package_id = $js->package_id;
+        $cash =  $js->cash;
+
+        if ($this->user_text == MentTextContext::get('cancel')) {
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
-        } elseif ($this->user_text == MentTextContext::get('yes_answar')) {
-
-            $js = json_decode($this->dataStory);
-            $percentage = (int) $js->percentage;
-            $package_id = (int) $js->package_id;
+        } elseif ($this->user_text == TextContext::get('addToPricesByPercentage', [$percentage])) {
 
             $this->TelegramDb->addUserPackageByPercentage($this->user_id, $percentage, $this->user_reference, $package_id);
+            $this->TelegramContext->changed_new_price_package();
+
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->delStory($this->user_id);
+        } elseif ($this->user_text == TextContext::get('addToPricesByCash', [$cash])) {
+
+            $this->TelegramDb->addUserPackageByCash($this->user_id, $cash, $this->user_reference, $package_id);
             $this->TelegramContext->changed_new_price_package();
 
             $this->TelegramContext->backToHome();
