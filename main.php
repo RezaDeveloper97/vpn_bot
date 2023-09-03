@@ -39,5 +39,5 @@ if (!$TelegramDb->checkUser($telegram_id)) {
     exit;
 }
 
-$user = $TelegramDb->getUserByTelegramId($telegram_id);
-new Story($user, $TelegramDb, $TelegramContext);
+
+new Story($json);

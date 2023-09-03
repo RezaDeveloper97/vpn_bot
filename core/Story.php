@@ -9,12 +9,15 @@ final class Story
     public $TelegramDb;
     public $TelegramContext;
     public $dataStory;
-    public function __construct($user, $TelegramDb, $TelegramContext)
+    public function __construct($json)
     {
+        $this->TelegramDb = new TelegramDb();
+        $this->TelegramContext = new TelegramContext($json);
+
+        $user = $this->TelegramDb->getUserByTelegramId($this->TelegramContext->telegram_id);
+
         $this->user_id = $user['id'];
         $this->user_reference = $user['user_reference'];
-        $this->TelegramDb = $TelegramDb;
-        $this->TelegramContext = $TelegramContext;
         $this->user_text = numberConvertor::persianNumberToEnglish($this->TelegramContext->json->message->text);
 
         $story = $this->TelegramDb->getStory($this->user_id) ?: ['title' => 'welcomeSeller', 'data' => null];
@@ -65,7 +68,6 @@ final class Story
 
             createPDF::pricesList($generateTable, $pdf_file_path);
             $this->TelegramContext->send_file($pdf_file_path, TextContext::get('listOfTheLatestPrices'));
-
         } else {
             $this->iDontKnow(MentContext::home());
         }
