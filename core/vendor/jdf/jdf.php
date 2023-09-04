@@ -1,5 +1,5 @@
 <?php
-class jdf
+class Jdf
 {
   public function jdate($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehran', $tr_num = 'fa')
   {
@@ -443,7 +443,7 @@ class jdf
           $out .= $sub;
       }
     }
-    return ($this->tr_num != 'en') ? $this->tr_num($out, 'fa', '.') : $out;
+    return ($tr_num != 'en') ? $this->tr_num($out, 'fa', '.') : $out;
   }
 
   /*	F	*/

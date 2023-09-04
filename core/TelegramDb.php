@@ -18,6 +18,11 @@ final class TelegramDb extends Database
         return $this->lastInsertId();
     }
 
+    public function changeName($user_id, $title)
+    {
+        $this->query("UPDATE `users` SET `title` = ? WHERE id = ?", [$title, $user_id]);
+    }
+
     public function getUserByTelegramId($telegram_id)
     {
         $user = $this->fetch("SELECT * FROM `users` WHERE `telegram_id` = ?", [$telegram_id]);
@@ -146,9 +151,9 @@ final class TelegramDb extends Database
         return $this->query($sql, [$user_id, $user_reference, $package_id]);
     }
 
-    public function addCustomer($user_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price)
+    public function addCustomer($user_id, $package_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price)
     {
-        return $this->query("INSERT INTO `customers`(`user_id`, `vpn_server`, `vpn_username`, `vpn_password`, `register_date`, `buy_price`) VALUES(?,?,?,?,?,?)", [$user_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price]);
+        return $this->query("INSERT INTO `customers`(`user_id`, `package_id`, `vpn_server`, `vpn_username`, `vpn_password`, `register_date`, `buy_price`) VALUES(?,?,?,?,?,?,?)", [$user_id, $package_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price]);
     }
 
     public function getMyCustomers($user_id)
@@ -164,5 +169,10 @@ final class TelegramDb extends Database
     public function getCustomerByUsername($user_id, $vpn_username)
     {
         return $this->fetch("SELECT * FROM `customers` WHERE `user_id` = ? AND `vpn_username` = ?", [$user_id, $vpn_username]);
+    }
+
+    public function getMyBuyers($user_reference)
+    {
+        return $this->fetchAll("SELECT * FROM `users` WHERE `user_reference` = ?", [$user_reference]);
     }
 }

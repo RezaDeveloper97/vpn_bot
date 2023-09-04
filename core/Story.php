@@ -31,6 +31,23 @@ final class Story
         $this->TelegramContext->sendMessage($this->TelegramContext->telegram_id, TextContext::get('iDontKnow'), $keyboard);
     }
 
+    public function importName()
+    {
+        if (mb_strlen($this->user_text) > 50) {
+            $this->TelegramContext->wrong_name_length();
+            return false;
+        }
+
+        if (!preg_match('/^[\p{Arabic}\s]+$/u', $this->user_text)) {
+            $this->TelegramContext->wrong_name_persian();
+            return false;
+        }
+
+        $this->TelegramDb->changeName($this->user_id, $this->user_text);
+        $this->TelegramContext->backToHome();
+        $this->TelegramDb->delStory($this->user_id);
+    }
+
     public function welcomeSeller()
     {
         if ($this->user_text == MentTextContext::get('mylink')) {
@@ -51,9 +68,10 @@ final class Story
             $this->TelegramContext->send_my_customers($myCustomers);
             $this->TelegramDb->setStory($this->user_id, 'myCustomers');
 
-        } elseif ($this->user_text == MentTextContext::get('buyers')) {
+        } elseif ($this->user_text == MentTextContext::get('my_buyers')) {
 
-            $this->TelegramContext->send_my_buyers([]);
+            $myBuyers = $this->TelegramDb->getMyBuyers($this->user_id);
+            $this->TelegramContext->send_my_buyers($myBuyers);
 
         } elseif ($this->user_text == MentTextContext::get('change_price')) {
 
@@ -104,11 +122,17 @@ final class Story
         }, $myCustomers);
 
         if (in_array($this->user_text, $customers)) {
+            $this->TelegramDb->delStory($this->user_id);
+
             $vpn = $this->TelegramDb->getCustomerByUsername($this->user_id, $this->user_text);
-            $this->TelegramContext->send_customer_informations($vpn['vpn_server'], $vpn['vpn_username'], $vpn['vpn_password'], $vpn['register_date']);
+            $Jdf = new Jdf();
+            $register_date = $Jdf->jdate('Y/m/d ساعت H:i:s', strtotime($vpn['register_date']));
+
+            $package_name = $this->TelegramDb->getFullTitlePackage($this->user_reference, $vpn['package_id']);
+
+            $this->TelegramContext->send_customer_informations($package_name, $vpn['vpn_server'], $vpn['vpn_username'], $vpn['vpn_password'], $register_date, '-');
 
             $this->TelegramContext->backToHome();
-            $this->TelegramDb->delStory($this->user_id);
         } else {
             $this->iDontKnow();
         }

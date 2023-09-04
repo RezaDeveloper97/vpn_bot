@@ -20,6 +20,7 @@ spl_autoload_register(function ($className) {
 
     $classMap = [
         'TCPDF' => '/core/vendor/tcpdf/tcpdf.php',
+        'Jdf' => '/core/vendor/jdf/jdf.php',
     ];
 
     $classPath = __DIR__ . $classMap[$className];

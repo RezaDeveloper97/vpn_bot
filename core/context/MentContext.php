@@ -10,10 +10,9 @@ class MentContext extends MentTextContext
     public static function home()
     {
         return static::keyboardGenerator([
-            [MentTextContext::get('renew_vpn'), MentTextContext::get('buy_vpn')],
-            [MentTextContext::get('my_customers')],
+            [MentTextContext::get('my_customers'), MentTextContext::get('buy_vpn')],
             [MentTextContext::get('prices_list'), MentTextContext::get('change_price')],
-            [MentTextContext::get('mylink'), MentTextContext::get('buyers')]
+            [MentTextContext::get('mylink'), MentTextContext::get('my_buyers')]
         ]);
     }
 

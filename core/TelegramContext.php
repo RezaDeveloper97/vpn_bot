@@ -24,8 +24,22 @@ class TelegramContext extends ApiBot
 
     public function start()
     {
-        $keyboard = MentContext::home();
-        $this->sendMessage($this->telegram_id, TextContext::get('welcome', [$this->firstname]), $keyboard);
+        $this->sendMessage($this->telegram_id, TextContext::get('welcome', [$this->firstname]), false);
+    }
+
+    public function import_name()
+    {
+        $this->sendMessage($this->telegram_id, TextContext::get('inportName'), false);
+    }
+
+    public function wrong_name_length()
+    {
+        $this->sendMessage($this->telegram_id, TextContext::get('wrongNameLength'), false);
+    }
+
+    public function wrong_name_persian()
+    {
+        $this->sendMessage($this->telegram_id, TextContext::get('wrongNamePersian'), false);
     }
 
     public function backToHome()
@@ -43,6 +57,16 @@ class TelegramContext extends ApiBot
     public function send_my_buyers(array $buyers)
     {
         if (count($buyers) > 0) {
+            $keyboard = [];
+            $keyboard[] = [MentTextContext::get('cancel')];
+
+            $buyers = array_map(function ($item) {
+                return ["$item[telegram_id] - $item[firstname]"];
+            }, $buyers);
+
+            $keyboard = self::keyboardGenerator(array_merge($keyboard, $buyers));
+
+            $this->sendMessage($this->telegram_id, TextContext::get('chooseOne'), $keyboard);
         } else {
             $keyboard = MentContext::home();
             $this->sendMessage($this->telegram_id, TextContext::get('notingCustomers'), $keyboard);
@@ -68,10 +92,17 @@ class TelegramContext extends ApiBot
         }
     }
 
-    public function send_customer_informations($server, $username, $password, $register_date)
+    public function send_customer_informations($package_name, $server, $username, $password, $register_date, $capacity, $withKeyboard = true)
     {
-        $keyboard = MentContext::home();
-        $this->sendMessage($this->telegram_id, TextContext::get('customerInformations', [$server, $username, $password, $register_date]), $keyboard);
+        $keyboard = [
+            'inline_keyboard' => [
+                [
+                    ['text' => MentTextContext::get('renew_vpn'), 'callback_data' => "renew_vpn-$username"],
+                    ['text' => MentTextContext::get('expansion_capacity_vpn'), 'callback_data' => "expansion_capacity_vpn-$username"],
+                ],
+            ],
+        ];
+        $this->sendMessage($this->telegram_id, TextContext::get('customerInformations', [$package_name, $server, $username, $password, $register_date, $capacity]), $withKeyboard ? $keyboard : null);
     }
 
     public function choose_one(array $packages)

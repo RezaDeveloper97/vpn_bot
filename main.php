@@ -34,10 +34,13 @@ if (!$TelegramDb->checkUser($telegram_id)) {
         $user_refrence = $user_ref ? $user_ref['id'] : 0;
     }
 
-    $TelegramDb->insertUser($telegram_id, $firstname, $lastname, $username, $user_refrence);
+    $user_id = $TelegramDb->insertUser($telegram_id, $firstname, $lastname, $username, $user_refrence);
     $TelegramContext->start();
+    $TelegramContext->import_name();
+
+    $TelegramDb->setStory($user_id, 'importName');
+
     exit;
 }
-
 
 new Story($json);
