@@ -42,11 +42,36 @@ class TelegramContext extends ApiBot
 
     public function send_my_buyers(array $buyers)
     {
-        $keyboard = MentContext::home();
         if (count($buyers) > 0) {
         } else {
+            $keyboard = MentContext::home();
             $this->sendMessage($this->telegram_id, TextContext::get('notingCustomers'), $keyboard);
         }
+    }
+
+    public function send_my_customers(array $customers)
+    {
+        if (count($customers) > 0) {
+            $keyboard = [];
+            $keyboard[] = [MentTextContext::get('cancel')];
+
+            $customers = array_map(function ($item) {
+                return [$item['vpn_username']];
+            }, $customers);
+
+            $keyboard = self::keyboardGenerator(array_merge($keyboard, $customers));
+
+            $this->sendMessage($this->telegram_id, TextContext::get('chooseOne'), $keyboard);
+        } else {
+            $keyboard = MentContext::home();
+            $this->sendMessage($this->telegram_id, TextContext::get('notingCustomers'), $keyboard);
+        }
+    }
+
+    public function send_customer_informations($server, $username, $password, $register_date)
+    {
+        $keyboard = MentContext::home();
+        $this->sendMessage($this->telegram_id, TextContext::get('customerInformations', [$server, $username, $password, $register_date]), $keyboard);
     }
 
     public function choose_one(array $packages)

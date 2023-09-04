@@ -11,6 +11,7 @@ class MentContext extends MentTextContext
     {
         return static::keyboardGenerator([
             [MentTextContext::get('renew_vpn'), MentTextContext::get('buy_vpn')],
+            [MentTextContext::get('my_customers')],
             [MentTextContext::get('prices_list'), MentTextContext::get('change_price')],
             [MentTextContext::get('mylink'), MentTextContext::get('buyers')]
         ]);

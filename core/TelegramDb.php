@@ -1,6 +1,7 @@
 <?php
 final class TelegramDb extends Database
 {
+    use wordsReplace;
     public function __construct()
     {
         parent::__construct();
@@ -124,23 +125,44 @@ final class TelegramDb extends Database
         return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) VALUES (?,?,?)", [$user_id, $package_id, $price]);
     }
 
-    public function addUserPackageByPercentage($user_id, $percentage, $user_reference, $package_id)
+    private function _getQueryaddUserPackageBy($var1, $var2)
     {
-        return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) 
-        SELECT ?, t.id, IF(tt.price > 0, tt.price * 1.$percentage, t.price * 1.$percentage) as `price` 
+        return wordsReplace::wordsReplace("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) 
+        SELECT ?, t.id, IF(tt.price > 0, tt.price $, t.price $) as `price` 
         FROM `packages` t 
         LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? 
-        WHERE t.price > 0 AND t.`id` != ?;
-        ", [$user_id, $user_reference, $package_id]);
+        WHERE t.price > 0 AND t.`id` != ?", [$var1, $var2]);
+    }
+
+    public function addUserPackageByPercentage($user_id, $percentage, $user_reference, $package_id)
+    {
+        $sql = $this->_getQueryaddUserPackageBy("* 1.$percentage", "* 1.$percentage");
+        return $this->query($sql, [$user_id, $user_reference, $package_id]);
     }
 
     public function addUserPackageByCash($user_id, $cash, $user_reference, $package_id)
     {
-        return $this->query("REPLACE INTO `user_packages`(`user_id`, `package_id`, `price`) 
-        SELECT ?, t.id, IF(tt.price > 0, tt.price + $cash, t.price + $cash) as `price` 
-        FROM `packages` t 
-        LEFT JOIN `user_packages` tt ON tt.package_id = t.id AND tt.user_id = ? 
-        WHERE t.price > 0 AND t.`id` != ?;
-        ", [$user_id, $user_reference, $package_id]);
+        $sql = $this->_getQueryaddUserPackageBy("+ $cash", "+ $cash");
+        return $this->query($sql, [$user_id, $user_reference, $package_id]);
+    }
+
+    public function addCustomer($user_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price)
+    {
+        return $this->query("INSERT INTO `customers`(`user_id`, `vpn_server`, `vpn_username`, `vpn_password`, `register_date`, `buy_price`) VALUES(?,?,?,?,?,?)", [$user_id, $vpn_server, $vpn_username, $vpn_password, $register_date, $buy_price]);
+    }
+
+    public function getMyCustomers($user_id)
+    {
+        return $this->fetchAll("SELECT * FROM `customers` WHERE `user_id` = ?", [$user_id]);
+    }
+
+    public function getCustomerById($id)
+    {
+        return $this->fetch("SELECT * FROM `customers` WHERE `id` = ?", [$id]);
+    }
+
+    public function getCustomerByUsername($user_id, $vpn_username)
+    {
+        return $this->fetch("SELECT * FROM `customers` WHERE `user_id` = ? AND `vpn_username` = ?", [$user_id, $vpn_username]);
     }
 }

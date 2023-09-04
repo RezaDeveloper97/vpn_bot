@@ -34,21 +34,36 @@ final class Story
     public function welcomeSeller()
     {
         if ($this->user_text == MentTextContext::get('mylink')) {
+
             $link = $this->TelegramContext::$bot_link . "?start=" . $this->TelegramContext->telegram_id;
             $this->TelegramContext->send_my_link($link);
+
         } elseif ($this->user_text == MentTextContext::get('buy_vpn')) {
+
             $parent_id = 0;
             $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
             $this->TelegramContext->choose_one($packages);
             $this->TelegramDb->setStory($this->user_id, 'buyVPNLoop', $parent_id);
+
+        } elseif ($this->user_text == MentTextContext::get('my_customers')) {
+
+            $myCustomers = $this->TelegramDb->getMyCustomers($this->user_id);
+            $this->TelegramContext->send_my_customers($myCustomers);
+            $this->TelegramDb->setStory($this->user_id, 'myCustomers');
+
         } elseif ($this->user_text == MentTextContext::get('buyers')) {
+
             $this->TelegramContext->send_my_buyers([]);
+
         } elseif ($this->user_text == MentTextContext::get('change_price')) {
+
             $parent_id = 0;
             $packages = $this->TelegramDb->getPackagesByParentId($this->user_reference, $parent_id);
             $this->TelegramContext->choose_one($packages);
             $this->TelegramDb->setStory($this->user_id, 'changePriceLoop', $parent_id);
+
         } elseif ($this->user_text == MentTextContext::get('prices_list')) {
+
             $pdf_path = __DIR__ . '/users_pdf/';
             if (!is_dir($pdf_path))
                 mkdir($pdf_path);
@@ -68,8 +83,34 @@ final class Story
 
             createPDF::pricesList($generateTable, $pdf_file_path);
             $this->TelegramContext->send_file($pdf_file_path, TextContext::get('listOfTheLatestPrices'), MentContext::home());
+
         } else {
             $this->iDontKnow(MentContext::home());
+        }
+    }
+
+    public function myCustomers()
+    {
+        if ($this->user_text == MentTextContext::get('cancel')) {
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->delStory($this->user_id);
+            return false;
+        }
+
+        $myCustomers = $this->TelegramDb->getMyCustomers($this->user_id);
+
+        $customers = array_map(function ($item) {
+            return $item['vpn_username'];
+        }, $myCustomers);
+
+        if (in_array($this->user_text, $customers)) {
+            $vpn = $this->TelegramDb->getCustomerByUsername($this->user_id, $this->user_text);
+            $this->TelegramContext->send_customer_informations($vpn['vpn_server'], $vpn['vpn_username'], $vpn['vpn_password'], $vpn['register_date']);
+
+            $this->TelegramContext->backToHome();
+            $this->TelegramDb->delStory($this->user_id);
+        } else {
+            $this->iDontKnow();
         }
     }
 
@@ -140,7 +181,7 @@ final class Story
 
             $cash = floatval($this->user_text) - floatval($this_packge_price);
 
-            $this->TelegramContext->addToPrices($cash . "", $percentage . "");
+            $this->TelegramContext->addToPrices(number_format($cash), $percentage);
             $this->TelegramDb->setStory($this->user_id, 'addToPrices', json_encode(['percentage' => $percentage, 'cash' => $cash, 'package_id' => $this->dataStory]));
         } else {
             $this->iDontKnow(MentContext::cancel());
@@ -152,7 +193,7 @@ final class Story
         $js = json_decode($this->dataStory);
         $percentage = $js->percentage;
         $package_id = $js->package_id;
-        $cash =  $js->cash;
+        $cash = $js->cash;
 
         if ($this->user_text == MentTextContext::get('cancel')) {
             $this->TelegramContext->backToHome();
@@ -164,7 +205,7 @@ final class Story
 
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
-        } elseif ($this->user_text == TextContext::get('addToPricesByCash', [$cash])) {
+        } elseif ($this->user_text == TextContext::get('addToPricesByCash', [number_format($cash)])) {
 
             $this->TelegramDb->addUserPackageByCash($this->user_id, $cash, $this->user_reference, $package_id);
             $this->TelegramContext->changed_new_price_package();
@@ -215,7 +256,7 @@ final class Story
             $title = $this->TelegramDb->getFullTitlePackage($this->user_reference, $this->dataStory);
             $price = number_format($this->TelegramDb->getOrginalPricePackage($this->user_reference, $this->dataStory));
             $title .= ' ' . TextContext::get('withPrice', [$price]);
-            $this->TelegramContext->payment($title, 'https://www.zarinpal.com/');
+            $this->TelegramContext->payment($title, 'https://yatash.ir/bot/callback.php?tid=' . $this->TelegramContext->telegram_id . '&pid=' . $this->dataStory);
             $this->TelegramContext->backToHome();
             $this->TelegramDb->delStory($this->user_id);
         } else {
